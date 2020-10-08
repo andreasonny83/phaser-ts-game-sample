@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import Phaser, { Math } from 'phaser';
 import { Player } from '../Player/Player';
 
 export class GamePlay extends Phaser.Scene {
@@ -11,7 +11,7 @@ export class GamePlay extends Phaser.Scene {
 
   create() {
     const map = this.make.tilemap({ key: 'map' });
-    const tileSet = map.addTilesetImage('tiles', 'world', 32, 32);
+    const tileSet = map.addTilesetImage('tiles', 'world', 32, 32, 1, 2);
     const belowLayer = map.createStaticLayer('Below Player', tileSet, 0, 0);
     const worldLayer = map.createStaticLayer('World', tileSet, 0, 0);
     const aboveLayer = map.createStaticLayer('Above Player', tileSet, 0, 0);
@@ -22,18 +22,44 @@ export class GamePlay extends Phaser.Scene {
     this.physics.world.bounds.width = map.widthInPixels;
     this.player = new Player(this, spawnPoint.x, spawnPoint.y);
 
-    camera.zoom = 1.5;
+    camera.zoom = 1.25;
+    camera.roundPixels = true;
     camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     camera.startFollow(this.player);
-    worldLayer.setCollisionByProperty({ collides: true });
-    this.player.setCollideWorldBounds();
-    this.physics.add.collider(this.player, worldLayer);
+    worldLayer.setCollisionByProperty({ collides: true, water: true });
+
+    this.physics.add.collider(
+      this.player,
+      worldLayer,
+      (player: any, world: any) => {
+        const dir = player.body.angle * (180 / Math.PI2);
+        if (world.properties?.water && world.properties.water === true) {
+          player.dropToWater();
+        }
+      },
+      undefined,
+      this
+    );
 
     aboveLayer.setDepth(10);
     this.startDebug(worldLayer);
+
+    camera.fadeIn(1000, 0, 0, 0);
+
+    this.player.addListener('playerdrown', () => {
+      camera.fadeOut(2000, 180, 0, 0, () => {
+        camera.on(
+          'camerafadeoutcomplete',
+          () => {
+            this.scene.restart();
+          },
+          this
+        );
+      });
+    });
   }
 
-  update() {
+  update(frame: any, d: any) {
     this.player?.update(GamePlay.PLAYER_SPEED);
   }
 
